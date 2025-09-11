@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>授权码管理系统（实时同步版）</title>
 <style>
-/* 原有样式+新增弹窗遮罩层 */
+/* 原有样式+删除秒相关样式 */
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}
 body{background:#f3f3f3;color:#333;padding:10px}
 .login-panel{background:#fff;padding:15px;border-radius:4px;margin:10px 0;display:block}
@@ -33,10 +33,10 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 .use-status{padding:2px 6px;border-radius:4px;font-size:12px;display:inline-block}
 .used{background:#28a745;color:#fff}
 .unused{background:#6c757d;color:#fff}
+/* 倒计时样式：删除秒相关样式，简化显示 */
 .countdown{font-family:monospace;color:#dc3545;font-weight:500}
 .countdown.expired{color:#dc3545}
-.countdown.active{color:#28a745}
-/* 弹窗+遮罩层（新增遮罩，防止弹窗显示时操作页面） */
+/* 弹窗+遮罩层 */
 #mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:99;display:none}
 #codeToast {position:fixed;bottom:20px;right:20px;background:white;border:1px solid #eee;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);padding:12px 16px;width:320px;z-index:100;display:none}
 #codeToast .title{font-size:14px;color:#333;margin-bottom:8px;font-weight:500}
@@ -52,10 +52,10 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 </style>
 </head>
 <body>
-<!-- 新增遮罩层（弹窗显示时覆盖页面，防止误操作） -->
+<!-- 遮罩层 -->
 <div id="mask"></div>
 
-<!-- 原有DOM结构不变 -->
+<!-- 登录面板 -->
 <div class="login-panel" id="loginPanel">
   <h3>管理员登录</h3>
   <input type="email" id="loginEmail" class="login-input" placeholder="Firebase邮箱">
@@ -64,6 +64,7 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
   <div class="login-tip" id="loginTip"></div>
 </div>
 
+<!-- 生成+表格区域 -->
 <div class="generate-area" id="generateArea">
 <select id="authType">
 <option value="permanent">永久授权</option>
@@ -81,12 +82,12 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 <th>授权码</</</th>
 <th>使用状态</</</th>
 <th>首次使用时间</</</th>
-<th>剩余时间（精确到秒）</</th>
+<th>剩余时间</</th> <!-- 已删除“（精确到秒）” -->
 <th>状态</</</th>
 <th>时长</</</th>
 <th>到期时间</</th>
-<th>本地随机码</</th>
-<th>管理操作</</th>
+<th>本地随机码</</</th>
+<th>管理操作</</</th>
 </tr>
 </thead>
 <tbody id="authTableBody">
@@ -97,13 +98,14 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 </table>
 </div>
 
+<!-- 弹窗 -->
 <div id="codeToast">
   <div class="title">授权码生成成功</div>
   <div class="auth-code" id="currentAuthCode"></div>
   <div class="tip" id="copyTip">已自动复制到剪贴板</div>
   <div class="btn-group">
     <button onclick="window.copyCurrentCode()">重新复制</button>
-    <button onclick="closeCodeToast()">关闭</button> <!-- 绑定统一关闭函数 -->
+    <button onclick="closeCodeToast()">关闭</button>
   </div>
 </div>
 <div id="loading">处理中...</div>
@@ -115,14 +117,14 @@ window.copyCurrentCode = () => window.__authModule?.copyCurrentCode();
 window.verifyAuthCode = (code) => window.__authModule?.verifyAuthCode(code);
 window.onVerifyResult = (success, message) => { alert(message); };
 window.__authModule = {};
-// 新增：统一关闭弹窗+遮罩
+// 统一关闭弹窗+遮罩
 window.closeCodeToast = () => {
   document.getElementById('codeToast').style.display = 'none';
   document.getElementById('mask').style.display = 'none';
 };
 </script>
 
-<!-- Firebase 核心脚本（修复重复生成bug） -->
+<!-- Firebase 核心脚本（删除秒显示+每分钟更新） -->
 <script type="module">
   const CONFIG = {
     FIREBASE: {
@@ -147,12 +149,12 @@ window.closeCodeToast = () => {
   const authRef = ref(db, "authCodes");
   const authByCodeRef = ref(db, "authCodesByCode");
 
-  // 全局变量+新增【生成状态锁】（防止重复触发）
+  // 全局变量
   let authCache = [];
   let existingCodes = new Set();
   let currentCode = "";
-  let countdownInterval = null;
-  let isGenerating = false; // 新增：生成状态锁，true=正在生成
+  let countdownInterval = null; // 倒计时定时器（改为每分钟触发）
+  let isGenerating = false;
 
   // 生成随机码（不变）
   const generateRandom = (type) => {
@@ -179,6 +181,7 @@ window.closeCodeToast = () => {
     year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'
   });
 
+  // 核心修改：计算剩余时间（删除秒数，只保留天、时、分）
   const getAuthInfo = (auth) => {
     const isPermanent = auth.durationType === 'permanent';
     const isUsed = auth.isUsed ?? false;
@@ -186,6 +189,7 @@ window.closeCodeToast = () => {
     let remainingTime = '未开始计时';
     let isExpired = false;
     let authStatusText = '未使用';
+
     if (isUsed) {
       authStatusText = '已使用';
       if (!isPermanent) {
@@ -197,24 +201,27 @@ window.closeCodeToast = () => {
             year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'
           });
         }
+
         const diff = new Date(expireTime).getTime() - Date.now();
         if (diff <= 0) {
           remainingTime = '已过期';
           isExpired = true;
           authStatusText = '已过期';
         } else {
+          // 仅计算天、时、分（删除秒数计算）
           const days = Math.floor(diff / 86400000);
           const hours = Math.floor((diff % 86400000) / 3600000);
           const minutes = Math.floor((diff % 3600000) / 60000);
-          const seconds = Math.floor((diff % 60000) / 1000);
           const pad = (num) => num.toString().padStart(2, '0');
-          remainingTime = `${pad(days)}天${pad(hours)}时${pad(minutes)}分${pad(seconds)}秒`;
+          // 拼接时删除秒数显示
+          remainingTime = `${pad(days)}天${pad(hours)}时${pad(minutes)}分`;
         }
       } else {
         remainingTime = '永久有效';
         expireTime = '永久有效';
       }
     }
+
     return {
       useStatus: { text: isUsed ? '已使用' : '未使用', cls: isUsed ? 'used' : 'unused' },
       authStatus: { text: authStatusText, cls: isExpired ? 'expired' : (isPermanent ? 'permanent' : 'unbound') },
@@ -254,17 +261,19 @@ window.closeCodeToast = () => {
     }, 200);
   };
 
+  // 创建表格行（删除秒相关显示）
   const createAuthRow = (auth) => {
     const { useStatus, authStatus, firstUseTime, remainingTime, expireTime, isExpired } = getAuthInfo(auth);
-    const countdownCls = isExpired ? 'countdown expired' : (auth.durationType === 'permanent' ? '' : 'countdown active');
+    // 倒计时类名：删除秒相关的active类，简化判断
+    const countdownCls = isExpired ? 'countdown expired' : (auth.durationType === 'permanent' ? '' : 'countdown');
     
     const row = document.createElement('tr');
-    row.setAttribute('data-id', auth.id || `temp-${Date.now()}`);
+    row.setAttribute('data-id', auth.id || `temp-${Date.now()}-${auth.code?.slice(0, 4)}`);
     row.innerHTML = `
       <td>${auth.code}</td>
       <td><span class="use-status ${useStatus.cls}">${useStatus.text}</span></td>
       <td>${firstUseTime}</td>
-      <td><span class="${countdownCls}">${remainingTime}</span></td>
+      <td><span class="${countdownCls}">${remainingTime}</span></td> <!-- 无秒数显示 -->
       <td><span class="status ${authStatus.cls}">${authStatus.text}</span></td>
       <td>${auth.duration}</td>
       <td>${expireTime}</td>
@@ -274,28 +283,49 @@ window.closeCodeToast = () => {
     return row;
   };
 
-  // 120FPS倒计时（不变）
+  // 核心修改：倒计时（改为每分钟更新，删除秒相关逻辑）
   const startCountdown = () => {
+    // 清理旧定时器（防止重复）
     if (countdownInterval) clearInterval(countdownInterval);
-    let isActive = true;
-    const countdownCache = new Map();
 
-    document.querySelectorAll('.countdown').forEach(el => {
-      const authRow = el.closest('tr');
-      if (authRow) countdownCache.set(authRow.dataset.id, el);
-    });
+    // 每分钟（60000毫秒）更新一次剩余时间
+    countdownInterval = setInterval(() => {
+      const updateIds = [];
+      // 1. 先判断哪些授权码需要更新状态（如过期）
+      authCache.forEach(auth => {
+        if (auth.durationType === 'permanent' || auth.status === '已过期') return;
+        const { isExpired } = getAuthInfo(auth);
+        if (isExpired && auth.status !== '已过期') {
+          auth.status = '已过期';
+          updateIds.push(auth.id);
+        }
+      });
 
-    const updateCountdown = () => {
-      if (!isActive) return;
-      countdownCache.forEach((el, authId) => {
-        const auth = authCache.find(a => a.id === authId);
+      // 2. 过期授权码：更新数据库+UI
+      if (updateIds.length > 0) {
+        const updates = {};
+        updateIds.forEach(id => updates[`authCodes/${id}/status`] = '已过期');
+        updateIds.forEach(id => {
+          const auth = authCache.find(item => item.id === id);
+          if (auth) updates[`authCodesByCode/${auth.code}/status`] = '已过期';
+        });
+        update(ref(db), updates).catch(err => console.error('过期更新失败：', err));
+        updateIds.forEach(id => renderTable(id));
+      }
+
+      // 3. 未过期授权码：仅更新剩余时间文本（不重绘行）
+      document.querySelectorAll('.countdown').forEach(el => {
+        const authId = el.closest('tr')?.getAttribute('data-id');
+        if (!authId) return;
+        const auth = authCache.find(item => item.id === authId);
         if (auth) el.textContent = getAuthInfo(auth).remainingTime;
       });
-      requestAnimationFrame(updateCountdown);
-    };
-    requestAnimationFrame(updateCountdown);
+    }, 60000); // 1分钟 = 60000毫秒
 
-    window.addEventListener('beforeunload', () => { isActive = false; });
+    // 页面关闭清理定时器
+    window.addEventListener('beforeunload', () => {
+      if (countdownInterval) clearInterval(countdownInterval);
+    });
   };
 
   // 实时监听（不变）
@@ -323,7 +353,7 @@ window.closeCodeToast = () => {
         existingCodes.add(authData.code);
       });
       renderTable();
-      startCountdown();
+      startCountdown(); // 启动每分钟更新
       loading.style.display = 'none';
     });
 
@@ -366,19 +396,16 @@ window.closeCodeToast = () => {
     });
   };
 
-  // 生成授权码（核心修复：三重防重复）
+  // 生成授权码（不变，保留防重复）
   const generateAuthCode = async () => {
     const user = auth.currentUser;
     if (!user || user.uid !== CONFIG.ADMIN_UID) {
       alert("请先登录管理员账号！");
       return;
     }
-
-    // 1. 状态锁防重复（即使按钮禁用失效，也能阻止）
     if (isGenerating) return;
     isGenerating = true;
 
-    // 2. 按钮禁用防重复
     const generateBtn = document.getElementById('generateBtn');
     generateBtn.disabled = true;
     generateBtn.textContent = '生成中...';
@@ -400,25 +427,20 @@ window.closeCodeToast = () => {
         expireTime: '',
         status: '未使用'
       };
-      // 3. 临时码加唯一标识（防止缓存重复添加）
       const tempId = `temp-${Date.now()}-${newCode.slice(0, 4)}`;
       newAuth.id = tempId;
 
-      // 乐观更新UI
       authCache.unshift(newAuth);
       existingCodes.add(newCode);
       renderTable('', newAuth);
 
-      // 异步写入数据库
       const newRef = await push(authRef, newAuth);
       const dbId = newRef.key;
       await set(ref(db, `authCodesByCode/${newCode}`), { ...newAuth, id: dbId });
 
-      // 更新缓存ID
       authCache[0].id = dbId;
       renderTable(dbId);
 
-      // 显示弹窗+遮罩（遮罩阻止操作页面）
       await new Promise(resolve => setTimeout(resolve, 100));
       currentCode = newCode;
       try {
@@ -429,10 +451,9 @@ window.closeCodeToast = () => {
       }
       document.getElementById('currentAuthCode').textContent = newCode;
       document.getElementById('codeToast').style.display = 'block';
-      document.getElementById('mask').style.display = 'block'; // 显示遮罩
+      document.getElementById('mask').style.display = 'block';
 
     } catch (err) {
-      // 失败回滚（精准删除临时码，避免残留）
       const tempIndex = authCache.findIndex(a => a.id?.startsWith('temp-'));
       if (tempIndex !== -1) {
         existingCodes.delete(authCache[tempIndex].code);
@@ -442,7 +463,6 @@ window.closeCodeToast = () => {
       if (tempRow) tempRow.remove();
       alert(`生成失败：${err.message || '网络异常，请重试'}`);
     } finally {
-      // 恢复状态（无论成功失败，都解锁）
       isGenerating = false;
       generateBtn.disabled = false;
       generateBtn.textContent = '生成授权码';
@@ -559,11 +579,13 @@ window.closeCodeToast = () => {
             authCache[authIndex] = { ...authCache[authIndex], ...updateData };
             renderTable(targetAuthId);
           }
+          // 成功提示也删除秒数
           successMsg = isPermanent 
             ? `验证成功！授权码【${code}】永久有效` 
             : `验证成功！首次使用时间：${useTime}\n到期时间：${expireTime}`;
         } else {
           const authInfo = getAuthInfo(targetAuth);
+          // 成功提示删除秒数
           successMsg = isPermanent 
             ? `验证成功！授权码【${code}】永久有效` 
             : `验证成功！剩余时间：${authInfo.remainingTime}\n到期时间：${authInfo.expireTime}`;
@@ -607,7 +629,7 @@ window.closeCodeToast = () => {
     }
   };
 
-  // 页面初始化（绑定生成按钮）
+  // 页面初始化（不变）
   document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generateBtn');
     if (generateBtn) {
