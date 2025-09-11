@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>授权码管理系统（实时同步版）</title>
 <style>
-/* 保持精简样式，仅保留必要交互态 */
+/* 原有样式+新增弹窗遮罩层 */
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}
 body{background:#f3f3f3;color:#333;padding:10px}
 .login-panel{background:#fff;padding:15px;border-radius:4px;margin:10px 0;display:block}
@@ -36,6 +36,8 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 .countdown{font-family:monospace;color:#dc3545;font-weight:500}
 .countdown.expired{color:#dc3545}
 .countdown.active{color:#28a745}
+/* 弹窗+遮罩层（新增遮罩，防止弹窗显示时操作页面） */
+#mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:99;display:none}
 #codeToast {position:fixed;bottom:20px;right:20px;background:white;border:1px solid #eee;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);padding:12px 16px;width:320px;z-index:100;display:none}
 #codeToast .title{font-size:14px;color:#333;margin-bottom:8px;font-weight:500}
 #codeToast .auth-code{font-family:monospace;font-size:16px;color:#7d2ae8;padding:6px 10px;background:#f9f5ff;border-radius:4px;margin-bottom:10px;word-break:break-all}
@@ -43,14 +45,17 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 #codeToast .btn-group{display:flex;gap:8px;justify-content:flex-end}
 #codeToast .btn-group button{padding:4px 10px;font-size:12px}
 #loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.5);color:white;padding:8px 16px;border-radius:4px;font-size:14px;z-index:200;display:none}
-/* 骨架屏样式（首屏加速） */
+/* 骨架屏样式 */
 .skeleton{opacity:0.7;animation:skeleton-loading 1.5s linear infinite alternate}
 .skeleton-row{height:40px;margin-bottom:8px;background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%}
 @keyframes skeleton-loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
 </head>
 <body>
-<!-- 登录面板 -->
+<!-- 新增遮罩层（弹窗显示时覆盖页面，防止误操作） -->
+<div id="mask"></div>
+
+<!-- 原有DOM结构不变 -->
 <div class="login-panel" id="loginPanel">
   <h3>管理员登录</h3>
   <input type="email" id="loginEmail" class="login-input" placeholder="Firebase邮箱">
@@ -58,7 +63,7 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
   <button class="login-btn" onclick="handleLogin()">登录</button>
   <div class="login-tip" id="loginTip"></div>
 </div>
-<!-- 生成+表格区域 -->
+
 <div class="generate-area" id="generateArea">
 <select id="authType">
 <option value="permanent">永久授权</option>
@@ -68,52 +73,57 @@ th{background:#e9d5ff;position:sticky;top:0;z-index:1}
 </select>
 <button id="generateBtn">生成授权码</button>
 </div>
+
 <div class="container" id="tableContainer">
 <table>
 <thead>
 <tr>
-<th>授权码</</th>
-<th>使用状态</</th>
-<th>首次使用时间</</th>
+<th>授权码</</</th>
+<th>使用状态</</</th>
+<th>首次使用时间</</</th>
 <th>剩余时间（精确到秒）</</th>
-<th>状态</</th>
-<th>时长</</th>
+<th>状态</</</th>
+<th>时长</</</th>
 <th>到期时间</</th>
 <th>本地随机码</</th>
 <th>管理操作</</th>
-<!-- 已删除“备注”表头 -->
 </tr>
 </thead>
 <tbody id="authTableBody">
-  <!-- 骨架屏（首屏占位） -->
   <tr class="skeleton"><td colspan="9"><div class="skeleton-row"></div></td></tr>
   <tr class="skeleton"><td colspan="9"><div class="skeleton-row"></div></td></tr>
   <tr class="skeleton"><td colspan="9"><div class="skeleton-row"></div></td></tr>
 </tbody>
 </table>
 </div>
-<!-- 弹窗 -->
+
 <div id="codeToast">
   <div class="title">授权码生成成功</div>
   <div class="auth-code" id="currentAuthCode"></div>
   <div class="tip" id="copyTip">已自动复制到剪贴板</div>
   <div class="btn-group">
     <button onclick="window.copyCurrentCode()">重新复制</button>
-    <button onclick="document.getElementById('codeToast').style.display='none'">关闭</button>
+    <button onclick="closeCodeToast()">关闭</button> <!-- 绑定统一关闭函数 -->
   </div>
 </div>
 <div id="loading">处理中...</div>
-<!-- 全局函数壳（已删除updateRemark） -->
+
+<!-- 全局函数壳 -->
 <script>
 window.deleteAuthCode = (authId) => window.__authModule?.deleteAuthCode(authId);
 window.copyCurrentCode = () => window.__authModule?.copyCurrentCode();
 window.verifyAuthCode = (code) => window.__authModule?.verifyAuthCode(code);
 window.onVerifyResult = (success, message) => { alert(message); };
 window.__authModule = {};
+// 新增：统一关闭弹窗+遮罩
+window.closeCodeToast = () => {
+  document.getElementById('codeToast').style.display = 'none';
+  document.getElementById('mask').style.display = 'none';
+};
 </script>
-<!-- Firebase 核心脚本（保留所有优化，删除备注相关） -->
+
+<!-- Firebase 核心脚本（修复重复生成bug） -->
 <script type="module">
-  // 1. 基础配置（不变）
   const CONFIG = {
     FIREBASE: {
       apiKey: "AIzaSyBd88UKHBOUpyHCtMXt1vliPN_F_9-Eh-0",
@@ -127,7 +137,7 @@ window.__authModule = {};
     },
     ADMIN_UID: "mXN1EXITivUU0ZSdmSroJijmqHU2"
   };
-  // 2. 初始化Firebase（不变）
+
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
   import { getDatabase, ref, push, get, update, remove, set, onValue, onChildChanged, onChildAdded } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
@@ -136,11 +146,13 @@ window.__authModule = {};
   const db = getDatabase(app);
   const authRef = ref(db, "authCodes");
   const authByCodeRef = ref(db, "authCodesByCode");
-  // 3. 全局变量+基础工具函数（删除remark相关）
+
+  // 全局变量+新增【生成状态锁】（防止重复触发）
   let authCache = [];
   let existingCodes = new Set();
   let currentCode = "";
   let countdownInterval = null;
+  let isGenerating = false; // 新增：生成状态锁，true=正在生成
 
   // 生成随机码（不变）
   const generateRandom = (type) => {
@@ -167,7 +179,6 @@ window.__authModule = {};
     year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'
   });
 
-  // 授权码信息计算（不变）
   const getAuthInfo = (auth) => {
     const isPermanent = auth.durationType === 'permanent';
     const isUsed = auth.isUsed ?? false;
@@ -214,24 +225,20 @@ window.__authModule = {};
     };
   };
 
-  // 4. 表格渲染（删除备注列，优化DOM操作）
+  // 表格渲染（不变）
   const renderTable = (updateId = '', newAuth = null) => {
     const tableBody = document.getElementById('authTableBody');
     if (!tableBody) return;
 
-    // 防抖：200ms合并渲染（减少重排）
     clearTimeout(window.renderTimeout);
     window.renderTimeout = setTimeout(() => {
-      // 新增授权码：局部插入
       if (newAuth) {
         const newRow = createAuthRow(newAuth);
-        // 替换骨架屏（首屏加载后）
         const skeleton = tableBody.querySelector('.skeleton');
         if (skeleton) skeleton.replaceWith(newRow);
         else tableBody.prepend(newRow);
         return;
       }
-      // 更新单个授权码：局部替换
       if (updateId) {
         const oldRow = tableBody.querySelector(`tr[data-id="${updateId}"]`);
         if (oldRow) {
@@ -240,7 +247,6 @@ window.__authModule = {};
         }
         return;
       }
-      // 全量渲染：仅初始化时触发
       tableBody.innerHTML = '';
       const fragment = document.createDocumentFragment();
       authCache.forEach(auth => fragment.appendChild(createAuthRow(auth)));
@@ -248,7 +254,6 @@ window.__authModule = {};
     }, 200);
   };
 
-  // 创建表格行（已删除备注输入框）
   const createAuthRow = (auth) => {
     const { useStatus, authStatus, firstUseTime, remainingTime, expireTime, isExpired } = getAuthInfo(auth);
     const countdownCls = isExpired ? 'countdown expired' : (auth.durationType === 'permanent' ? '' : 'countdown active');
@@ -265,24 +270,21 @@ window.__authModule = {};
       <td>${expireTime}</td>
       <td>${auth.localRandom || '...'}</td>
       <td><button class="delete-btn" onclick="window.deleteAuthCode('${row.getAttribute('data-id')}')">删除</button></td>
-      <!-- 已删除备注列 -->
     `;
     return row;
   };
 
-  // 5. 120FPS倒计时（requestAnimationFrame适配高刷）
+  // 120FPS倒计时（不变）
   const startCountdown = () => {
     if (countdownInterval) clearInterval(countdownInterval);
     let isActive = true;
     const countdownCache = new Map();
 
-    // 缓存倒计时元素（只查1次DOM）
     document.querySelectorAll('.countdown').forEach(el => {
       const authRow = el.closest('tr');
       if (authRow) countdownCache.set(authRow.dataset.id, el);
     });
 
-    // 高刷更新：自动适配120/60Hz
     const updateCountdown = () => {
       if (!isActive) return;
       countdownCache.forEach((el, authId) => {
@@ -293,23 +295,20 @@ window.__authModule = {};
     };
     requestAnimationFrame(updateCountdown);
 
-    // 页面关闭清理
     window.addEventListener('beforeunload', () => { isActive = false; });
   };
 
-  // 6. 实时监听（不变，确保多端同步）
+  // 实时监听（不变）
   const startRealTimeAuthListener = () => {
     const loading = document.getElementById('loading');
     if (!loading) return;
     loading.style.display = 'block';
 
-    // 监听1：初始化全量数据
     onValue(authRef, (snapshot) => {
       authCache = [];
       existingCodes.clear();
       snapshot.forEach(child => {
         const authData = child.val();
-        // 不处理remark字段
         authCache.push({
           id: child.key,
           code: authData.code,
@@ -328,7 +327,6 @@ window.__authModule = {};
       loading.style.display = 'none';
     });
 
-    // 监听2：新增授权码
     onChildAdded(authRef, (childSnapshot) => {
       const newAuthData = childSnapshot.val();
       const newAuth = {
@@ -349,7 +347,6 @@ window.__authModule = {};
       }
     });
 
-    // 监听3：单个授权码变更
     onChildChanged(authRef, (childSnapshot) => {
       const updatedAuthId = childSnapshot.key;
       const updatedAuthData = childSnapshot.val();
@@ -369,7 +366,7 @@ window.__authModule = {};
     });
   };
 
-  // 7. 生成授权码（防抖+乐观更新，删除remark）
+  // 生成授权码（核心修复：三重防重复）
   const generateAuthCode = async () => {
     const user = auth.currentUser;
     if (!user || user.uid !== CONFIG.ADMIN_UID) {
@@ -377,8 +374,12 @@ window.__authModule = {};
       return;
     }
 
+    // 1. 状态锁防重复（即使按钮禁用失效，也能阻止）
+    if (isGenerating) return;
+    isGenerating = true;
+
+    // 2. 按钮禁用防重复
     const generateBtn = document.getElementById('generateBtn');
-    if (generateBtn.disabled) return;
     generateBtn.disabled = true;
     generateBtn.textContent = '生成中...';
     const loading = document.getElementById('loading');
@@ -389,7 +390,6 @@ window.__authModule = {};
       const type = document.getElementById('authType').value;
       const durationText = type === 'permanent' ? '永久' : `${{ day: 1, week: 7, month: 30 }[type]}天`;
       
-      // 构造数据（无remark字段）
       const newAuth = {
         code: newCode,
         durationType: type,
@@ -400,21 +400,25 @@ window.__authModule = {};
         expireTime: '',
         status: '未使用'
       };
-      // 乐观更新UI（内存操作，快速反馈）
+      // 3. 临时码加唯一标识（防止缓存重复添加）
+      const tempId = `temp-${Date.now()}-${newCode.slice(0, 4)}`;
+      newAuth.id = tempId;
+
+      // 乐观更新UI
       authCache.unshift(newAuth);
       existingCodes.add(newCode);
       renderTable('', newAuth);
 
-      // 异步写入数据库（不阻塞UI）
+      // 异步写入数据库
       const newRef = await push(authRef, newAuth);
-      newAuth.id = newRef.key;
-      await set(ref(db, `authCodesByCode/${newCode}`), newAuth);
+      const dbId = newRef.key;
+      await set(ref(db, `authCodesByCode/${newCode}`), { ...newAuth, id: dbId });
 
-      // 更新缓存ID（确保删除正常）
-      authCache[0].id = newAuth.id;
-      renderTable(newAuth.id);
+      // 更新缓存ID
+      authCache[0].id = dbId;
+      renderTable(dbId);
 
-      // 弹窗提示（延迟100ms，避免视觉过快）
+      // 显示弹窗+遮罩（遮罩阻止操作页面）
       await new Promise(resolve => setTimeout(resolve, 100));
       currentCode = newCode;
       try {
@@ -425,24 +429,30 @@ window.__authModule = {};
       }
       document.getElementById('currentAuthCode').textContent = newCode;
       document.getElementById('codeToast').style.display = 'block';
+      document.getElementById('mask').style.display = 'block'; // 显示遮罩
+
     } catch (err) {
-      // 失败回滚
-      authCache.shift();
-      existingCodes.delete(currentCode);
-      const firstRow = document.querySelector('#authTableBody tr:first-child');
-      if (firstRow) firstRow.remove();
+      // 失败回滚（精准删除临时码，避免残留）
+      const tempIndex = authCache.findIndex(a => a.id?.startsWith('temp-'));
+      if (tempIndex !== -1) {
+        existingCodes.delete(authCache[tempIndex].code);
+        authCache.splice(tempIndex, 1);
+      }
+      const tempRow = document.querySelector('tr[data-id^="temp-"]');
+      if (tempRow) tempRow.remove();
       alert(`生成失败：${err.message || '网络异常，请重试'}`);
     } finally {
+      // 恢复状态（无论成功失败，都解锁）
+      isGenerating = false;
       generateBtn.disabled = false;
       generateBtn.textContent = '生成授权码';
       loading.style.display = 'none';
     }
   };
 
-  // 8. 核心功能模块（删除updateRemark，优化删除逻辑）
+  // 核心功能模块（不变）
   window.__authModule = {
     deleteAuthCode: async (authId) => {
-      // 过滤临时行
       if (authId.startsWith('temp-')) {
         const tempRow = document.querySelector(`tr[data-id="${authId}"]`);
         if (tempRow) tempRow.remove();
@@ -459,29 +469,24 @@ window.__authModule = {};
       loading.style.display = 'block';
 
       try {
-        // 快速UI反馈：变灰禁用
         const delRow = document.querySelector(`tr[data-id="${authId}"]`);
         delRow.style.opacity = '0.5';
         delRow.style.pointerEvents = 'none';
 
-        // 查找缓存数据
         const delIndex = authCache.findIndex(auth => auth.id === authId);
         if (delIndex === -1) throw new Error('未找到该授权码');
         const delAuth = authCache[delIndex];
 
-        // 异步删除双节点
         await Promise.all([
           remove(ref(db, `authCodes/${authId}`)),
           remove(ref(db, `authCodesByCode/${delAuth.code}`))
         ]);
 
-        // 最终删除UI和缓存
         delRow.remove();
         authCache.splice(delIndex, 1);
         existingCodes.delete(delAuth.code);
         alert('删除成功！');
       } catch (err) {
-        // 失败回滚
         const delAuth = authCache.find(auth => auth.id === authId);
         if (delAuth) renderTable('', delAuth);
         alert(`删除失败：${err.message || '网络异常，请重试'}`);
@@ -545,12 +550,10 @@ window.__authModule = {};
             expireTime: expireTime,
             status: '已使用'
           };
-          // 更新数据库双节点
           await Promise.all([
             update(ref(db, `authCodes/${targetAuthId}`), updateData),
             update(ref(db, `authCodesByCode/${code}`), updateData)
           ]);
-          // 更新本地缓存
           const authIndex = authCache.findIndex(item => item.id === targetAuthId);
           if (authIndex !== -1) {
             authCache[authIndex] = { ...authCache[authIndex], ...updateData };
@@ -575,7 +578,7 @@ window.__authModule = {};
     }
   };
 
-  // 9. 登录逻辑（不变）
+  // 登录逻辑（不变）
   window.handleLogin = async () => {
     const email = document.getElementById('loginEmail')?.value.trim();
     const pwd = document.getElementById('loginPwd')?.value.trim();
@@ -592,7 +595,6 @@ window.__authModule = {};
         tip.textContent = '无管理员权限！';
         return;
       }
-      // 登录成功切换界面
       document.getElementById('loginPanel').style.display = 'none';
       document.getElementById('generateArea').style.display = 'flex';
       document.getElementById('tableContainer').style.display = 'block';
@@ -605,13 +607,12 @@ window.__authModule = {};
     }
   };
 
-  // 10. 页面初始化（绑定生成按钮，不变）
+  // 页面初始化（绑定生成按钮）
   document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generateBtn');
     if (generateBtn) {
       generateBtn.addEventListener('click', generateAuthCode);
     }
-    // 监听登录状态
     onAuthStateChanged(auth, async (user) => {
       if (user && user.uid === CONFIG.ADMIN_UID) {
         document.getElementById('loginPanel').style.display = 'none';
